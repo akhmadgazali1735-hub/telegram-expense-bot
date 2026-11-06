@@ -175,7 +175,7 @@ async function callSheet(payload) {
   const resp = await fetch(process.env.GOOGLE_SCRIPT_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ...payload, key: process.env.SCRIPT_KEY }),
+    body: JSON.stringify(payload),
   });
   const raw = await resp.text();
   let r;
