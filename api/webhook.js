@@ -1,40 +1,63 @@
+```javascript
 export default async function handler(req, res) {
-  if (req.method !== "POST") return res.status(200).send("Telegram expense bot is ready.");
+  if (req.method !== "POST") {
+    return res.status(200).send("Bot Expense aktif");
+  }
 
   const token = process.env.BOT_TOKEN;
-  const secret = process.env.WEBHOOK_SECRET;
-
-  if (!token) return res.status(500).send("BOT_TOKEN belum diatur.");
-
-  if (secret && req.headers["x-telegram-bot-api-secret-token"] !== secret) {
-    return res.status(401).send("Unauthorized");
-  }
+  const sheetUrl = process.env.GOOGLE_SCRIPT_URL;
 
   const message = req.body?.message;
   if (!message?.chat?.id) return res.status(200).send("OK");
 
   const chatId = message.chat.id;
   const text = (message.text || "").trim();
+
   let reply;
 
-  if (text === "/start" || text === "/help") {
-    reply = "Halo! Aku bot catatan pengeluaran.\n\nKirim: catat 25000 makan\nContoh: catat 15000 kopi";
+  if (text === "/start") {
+    reply = "Halo! Bot Expense siap mencatat pengeluaran.\n\nKetik:\ncatat 25000 makan";
   } else {
     const match = text.match(/^catat\s+(\d+)\s+(.+)$/i);
-    if (match) {
-      const amount = Number(match[1]).toLocaleString("id-ID");
-      const category = match[2].trim();
-      reply = `✅ Pengeluaran dicatat (sementara)\nNominal: Rp${amount}\nKategori: ${category}\n\nCatatan: versi starter ini belum menyimpan data ke database.`;
+
+    if (!match) {
+      reply = "Format salah.\nContoh: catat 25000 makan";
     } else {
-      reply = "Format belum cocok.\nKirim: catat 25000 makan";
+      const jumlah = Number(match[1]);
+      const kategori = match[2].trim();
+
+      try {
+        const response = await fetch(sheetUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            kategori: kategori,
+            keterangan: kategori,
+            jumlah: jumlah
+          })
+        });
+
+        if (!response.ok) throw new Error("Gagal menyimpan");
+
+        reply =
+          `✅ Pengeluaran berhasil disimpan!\n\n` +
+          `Kategori: ${kategori}\n` +
+          `Jumlah: Rp${jumlah.toLocaleString("id-ID")}`;
+      } catch (error) {
+        reply = "❌ Gagal menyimpan ke Google Sheets.";
+      }
     }
   }
 
   await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ chat_id: chatId, text: reply })
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      chat_id: chatId,
+      text: reply
+    })
   });
 
   return res.status(200).send("OK");
 }
+```
